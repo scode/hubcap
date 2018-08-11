@@ -1,0 +1,6 @@
+[package]
+name = "hubcap"
+version = "0.1.0"
+authors = ["Peter Schuller <peter.schuller@infidyne.com>"]
+
+[dependencies]
