@@ -9,3 +9,5 @@ name = "hc"
 path = "src/main.rs"
 
 [dependencies]
+github-rs = "0.6"
+serde_json = "1.0"
