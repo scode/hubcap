@@ -11,3 +11,4 @@ path = "src/main.rs"
 [dependencies]
 github-rs = "0.6"
 serde_json = "1.0"
+error-chain = "0.12.0"
