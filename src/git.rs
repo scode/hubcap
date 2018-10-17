@@ -46,7 +46,7 @@ impl SystemGit {
     }
 
     /// Set the path to the git binary to use. By default, the path is `git` and it is assumed to
-    /// be present in PATH.
+    /// be present in `PATH`.
     pub fn git_path<'a>(&'a mut self, path: &Path) -> &'a mut SystemGit {
         self.git_path = PathBuf::from(path);
         self
