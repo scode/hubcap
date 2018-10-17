@@ -2,6 +2,7 @@ extern crate clap;
 #[macro_use]
 extern crate failure;
 extern crate github_rs;
+extern crate hubcap;
 extern crate serde_json;
 
 use clap::App;
@@ -28,8 +29,7 @@ fn run() -> Result<(), Error> {
                 .short("v")
                 .multiple(true)
                 .help("Sets the level of verbosity"),
-        )
-        .subcommand(SubCommand::with_name("status").about("Print branch and PR status"))
+        ).subcommand(SubCommand::with_name("status").about("Print branch and PR status"))
         .get_matches();
 
     if let Some(_matches) = matches.subcommand_matches("status") {
