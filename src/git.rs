@@ -1,6 +1,7 @@
 use failure::Error;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 
 /// The possible states a file can be in, as reported by `git status`.
 ///
@@ -59,10 +60,55 @@ impl SystemGit {
         self.repo_path = PathBuf::from(path);
         self
     }
+
+    fn git_command(&self) -> Result<Command, Error> {
+        let git_path_str = path_to_str(&self.git_path)?;
+        let repo_path_str = path_to_str(&self.repo_path)?;
+
+        let mut cmd = Command::new(git_path_str);
+        cmd.arg("-C").arg(repo_path_str);
+
+        Ok(cmd)
+    }
 }
 
 impl Git for SystemGit {
     fn status(&self) -> Result<Vec<FileStatus>, Error> {
+        let _todo = self.git_command();
         Err(format_err!("not yet implemented"))
+    }
+}
+
+/// Convert a Path to a String, failing with an error if the string is not valid utf-8.
+///
+/// Future: Use https://doc.rust-lang.org/std/option/struct.NoneError.html when stable?
+fn path_to_str(p: &Path) -> Result<String, Error> {
+    p.to_str()
+        .ok_or_else(|| format_err!("path is not valid utf-8: {:?}", p))
+        .map(|s| s.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_to_str_valid_utf8() {
+        assert_eq!(
+            path_to_str(&PathBuf::from("valid utf-8")).unwrap(),
+            "valid utf-8"
+        );
+    }
+
+    #[test]
+    fn path_to_str_invalid_utf8() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
+        let bytes: &[u8] = &vec![255u8];
+        let osstr = OsStr::from_bytes(bytes);
+        let pb = PathBuf::from(osstr);
+
+        assert!(path_to_str(&pb).is_err())
     }
 }
