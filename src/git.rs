@@ -74,8 +74,28 @@ impl SystemGit {
 
 impl Git for SystemGit {
     fn status(&self) -> Result<Vec<FileStatus>, Error> {
-        let _todo = self.git_command();
-        Err(format_err!("not yet implemented"))
+        let mut cmd = self.git_command()?;
+
+        cmd.arg("status").arg("-z");
+
+        let output = cmd.output()?;
+
+        if !output.status.success() {
+            return Err(format_err!(
+                "git terminated in error: {}",
+                String::from_utf8(output.stderr)?
+            ));
+        }
+
+        let stdout = String::from_utf8(output.stdout)?;
+
+        // See git-status(1) for the behavior of -z. But in short:
+        //
+        //    <STATUS FLAG OR SPACE> <STATUS FLAG> <SPACE> <ANY CHARACTER EXCEPT NUL REPEATED> NUL
+        let status_lines: Vec<String> = stdout.split('\0').into();
+        let q = status_lines.chars().take(2);
+
+        Ok(vec![])
     }
 }
 
