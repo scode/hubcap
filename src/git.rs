@@ -1,4 +1,5 @@
 use failure::Error;
+//use regex::Regex;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -95,6 +96,7 @@ impl Git for SystemGit {
         let status_lines: Vec<&str> = stdout.split('\0').collect();
         let statuses: Vec<&str> = status_lines.iter().map(|line| *line).collect();
         //let q = status_lines.chars().take(2);
+        //let re = Regex::new("test").unwrap();
 
         Ok(vec![])
     }
