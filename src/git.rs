@@ -89,11 +89,12 @@ impl Git for SystemGit {
 
         let stdout = String::from_utf8(output.stdout)?;
 
-        // See git-status(1) for the behavior of -z. But in short:
+        // See gitb-status(1) for the behavior of -z. But in short:
         //
         //    <STATUS FLAG OR SPACE> <STATUS FLAG> <SPACE> <ANY CHARACTER EXCEPT NUL REPEATED> NUL
-        let status_lines: Vec<String> = stdout.split('\0').into();
-        let q = status_lines.chars().take(2);
+        let status_lines: Vec<&str> = stdout.split('\0').collect();
+        let statuses: Vec<&str> = status_lines.iter().map(|line| *line).collect();
+        //let q = status_lines.chars().take(2);
 
         Ok(vec![])
     }
