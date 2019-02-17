@@ -7,13 +7,20 @@ use std::process::Command;
 /// The possible states a file can be in, as reported by `git status`.
 ///
 /// See git-status(1).
-pub enum FileStatus {
+pub enum Status {
     Modified(PathBuf),
     Added(PathBuf),
     Deleted(PathBuf),
     Renamed { new: PathBuf, old: PathBuf },
     Copied { new: PathBuf, old: PathBuf },
     UpdatedUnMerged(PathBuf),
+    Untracked(PathBuf),
+}
+
+/// Represents the status of one path.
+pub struct PathStatus {
+    X: Status,
+    Y: Status,
 }
 
 pub trait Git {
@@ -22,7 +29,7 @@ pub trait Git {
     /// This is the equivalent of `git status`.
     ///
     /// If the git working copy is clean, an empty vec is returned.
-    fn status(&self) -> Result<Vec<FileStatus>, Error>;
+    fn status(&self) -> Result<Vec<EntryStatus>, Error>;
 }
 
 /// An implementation of the Git trait which uses a git binary present on the system to interact
@@ -90,13 +97,15 @@ impl Git for SystemGit {
 
         let stdout = String::from_utf8(output.stdout)?;
 
-        // See gitb-status(1) for the behavior of -z. But in short:
+        // See gitb-status(1) for the behavior of -z. But in short, for statuses other than renamed/copied:
         //
-        //    <STATUS FLAG OR SPACE> <STATUS FLAG> <SPACE> <ANY CHARACTER EXCEPT NUL REPEATED> NUL
+        //    <STATUS FLAG OR SPACE> <STATUS FLAG> <SPACE> <ANY CHARS EXCEPT NUL REPEATED> NUL
+        //
+        // For renamed/copied statuses, an additional <ANY CHARS EXCEPT NUL> NUL is used.
         let status_lines: Vec<&str> = stdout.split('\0').collect();
         let statuses: Vec<&str> = status_lines.iter().map(|line| *line).collect();
         //let q = status_lines.chars().take(2);
-        let re = Regex::new("test")?;
+        let re = Regex::new("")?;
 
         Ok(vec![])
     }
