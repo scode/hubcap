@@ -1,18 +1,33 @@
 use failure::Error;
+use regex::Regex;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-/// The possible states a file can be in, as reported by `git status`.
+/// The possible states a file can be in.
 ///
-/// See git-status(1).
-pub enum FileStatus {
+/// See also: StatusEntry
+pub enum Status {
     Modified(PathBuf),
     Added(PathBuf),
     Deleted(PathBuf),
     Renamed { new: PathBuf, old: PathBuf },
     Copied { new: PathBuf, old: PathBuf },
     UpdatedUnMerged(PathBuf),
+    Untracked(PathBuf),
+}
+
+/// A status "line" as reported by `git status`.
+///
+/// Please see git-status(1) for more.
+pub struct StatusEntry {
+    /// The "X" as described in git-status(1). It can represent the other side of a merge with
+    /// conflicts, or the status in the index, depending on the state of the repo.
+    pub merge_or_index: Status,
+
+    /// The "Y" as described in git-status(1). Represents the status of the file in the local
+    /// work tree.
+    pub work_tree: Status,
 }
 
 pub trait Git {
@@ -21,7 +36,7 @@ pub trait Git {
     /// This is the equivalent of `git status`.
     ///
     /// If the git working copy is clean, an empty vec is returned.
-    fn status(&self) -> Result<Vec<FileStatus>, Error>;
+    fn status(&self) -> Result<Vec<StatusEntry>, Error>;
 }
 
 /// An implementation of the Git trait which uses a git binary present on the system to interact
@@ -73,10 +88,37 @@ impl SystemGit {
 }
 
 impl Git for SystemGit {
-    fn status(&self) -> Result<Vec<FileStatus>, Error> {
-        let _todo = self.git_command();
-        Err(format_err!("not yet implemented"))
+    fn status(&self) -> Result<Vec<StatusEntry>, Error> {
+        let mut cmd = self.git_command()?;
+
+        cmd.arg("status").arg("-z");
+
+        let output = cmd.output()?;
+
+        if !output.status.success() {
+            return Err(format_err!(
+                "git terminated in error: {}",
+                String::from_utf8(output.stderr)?
+            ));
+        }
+
+        let stdout = String::from_utf8(output.stdout)?;
+
+        // In short, for statuses other than renamed/copied we expect:
+        //
+        //    <STATUS FLAG OR SPACE> <STATUS FLAG> <SPACE> <ANY CHARS EXCEPT NUL REPEATED> NUL
+        //
+        // For renamed/copied statuses, an additional <ANY CHARS EXCEPT NUL> NUL is used.
+        //
+        // See git-status(1) for more.
+        let _lines: Vec<&str> = stdout.split('\0').collect();
+
+        Ok(vec![])
     }
+}
+
+fn status_regex() -> Regex {
+    Regex::new(r"^(?P<x>[ MADRCU])(?P<y>[ MADRCU]) (?P<rest>.*)$").unwrap()
 }
 
 /// Convert a Path to a String, failing with an error if the string is not valid utf-8.
@@ -91,6 +133,19 @@ fn path_to_str(p: &Path) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn status_regex_correct() {
+        let cap = status_regex().captures("AM fname").unwrap();
+        assert_eq!(cap.name("x").unwrap().as_str(), "A");
+        assert_eq!(cap.name("y").unwrap().as_str(), "M");
+        assert_eq!(cap.name("rest").unwrap().as_str(), "fname");
+
+        assert!(status_regex().captures(" AM fname").is_none());
+        assert!(status_regex().captures("AMM fname").is_none());
+        assert!(status_regex().captures("AM").is_none());
+        assert!(status_regex().captures("AM").is_none());
+    }
 
     #[test]
     fn path_to_str_valid_utf8() {
