@@ -2,7 +2,6 @@ extern crate clap;
 #[macro_use]
 extern crate failure;
 extern crate github_rs;
-//extern crate hubcap;
 extern crate serde_json;
 
 use clap::App;
