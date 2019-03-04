@@ -117,7 +117,7 @@ impl Git for SystemGit {
     }
 }
 
-fn str_to_status(s: &str) -> Result<Status, Error> {
+fn make_status_entry(x: &str, y: &str, rest: &str, next_line: Option<&str>) -> Result<StatusEntry, Error> {
     bail!("not impl")
 }
 
@@ -127,10 +127,16 @@ where
 {
     let mut entries: Vec<StatusEntry> = Vec::new();
 
-    let mut expect_additional = false;
+    struct XYRest {
+        x: String,
+        y: String,
+        rest: String,
+    };
+    let mut maybe_partial_status: Option<XYRest> = None;
     for line in lines {
-        if expect_additional {
-            expect_additional = false;
+        if let Some(partial_status) = maybe_partial_status {
+            entries.push(make_status_entry(&partial_status.x, &partial_status.y, &partial_status.rest, Some(line))?);
+            maybe_partial_status = None;
         } else {
             let capture = status_regex()
                 .captures(line)
@@ -139,10 +145,11 @@ where
             let y = capture.name("y").unwrap().as_str();
             let rest = capture.name("rest").unwrap().as_str();
 
-            entries.push(StatusEntry {
-                merge_or_index: str_to_status(x)?,
-                work_tree: str_to_status(y)?,
-            });
+            if x == "C" || x == "R" || y == "C" || y == "R" {
+                maybe_partial_status = Some(XYRest{x: x.to_owned(), y: y.to_owned(), rest: rest.to_owned()})
+            } else {
+                entries.push(make_status_entry(x, y, rest, None)?);
+            }
         }
     }
 
