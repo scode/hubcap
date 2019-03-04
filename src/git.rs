@@ -111,10 +111,42 @@ impl Git for SystemGit {
         // For renamed/copied statuses, an additional <ANY CHARS EXCEPT NUL> NUL is used.
         //
         // See git-status(1) for more.
-        let _lines: Vec<&str> = stdout.split('\0').collect();
+        let lines: Vec<&str> = stdout.split('\0').collect();
 
-        Ok(vec![])
+        status_lines_to_entries(lines.into_iter())
     }
+}
+
+fn str_to_status(s: &str) -> Result<Status, Error> {
+    bail!("not impl")
+}
+
+fn status_lines_to_entries<'a, I>(lines: I) -> Result<Vec<StatusEntry>, Error>
+where
+    I: Iterator<Item = &'a str>,
+{
+    let mut entries: Vec<StatusEntry> = Vec::new();
+
+    let mut expect_additional = false;
+    for line in lines {
+        if expect_additional {
+            expect_additional = false;
+        } else {
+            let capture = status_regex()
+                .captures(line)
+                .ok_or(format_err!("unexpected git status line: {}", line))?;
+            let x = capture.name("x").unwrap().as_str();
+            let y = capture.name("y").unwrap().as_str();
+            let rest = capture.name("rest").unwrap().as_str();
+
+            entries.push(StatusEntry {
+                merge_or_index: str_to_status(x)?,
+                work_tree: str_to_status(y)?,
+            });
+        }
+    }
+
+    Ok(entries)
 }
 
 fn status_regex() -> Regex {

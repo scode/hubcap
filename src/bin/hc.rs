@@ -27,7 +27,8 @@ fn run() -> Result<(), Error> {
                 .short("v")
                 .multiple(true)
                 .help("Sets the level of verbosity"),
-        ).subcommand(SubCommand::with_name("status").about("Print branch and PR status"))
+        )
+        .subcommand(SubCommand::with_name("status").about("Print branch and PR status"))
         .get_matches();
 
     if let Some(_matches) = matches.subcommand_matches("status") {
