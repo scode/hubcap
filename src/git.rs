@@ -16,8 +16,14 @@ pub enum Status {
     Modified(PathBuf),
     Added(PathBuf),
     Deleted(PathBuf),
-    Renamed { new: PathBuf, old: PathBuf },
-    Copied { new: PathBuf, old: PathBuf },
+    Renamed {
+        new: PathBuf,
+        old: PathBuf,
+    },
+    Copied {
+        new: PathBuf,
+        old: PathBuf,
+    },
     UpdatedUnMerged(PathBuf),
     Untracked(PathBuf),
 }
@@ -292,101 +298,107 @@ mod tests {
 
     #[test]
     fn test_status_lines_to_entries_both_single_line() {
-        let r = status_lines_to_entries(vec![
-            "MD file.txt",
-        ].into_iter());
+        let r = status_lines_to_entries(vec!["MD file.txt"].into_iter());
         assert!(r.is_ok());
         let v = r.unwrap();
         assert_eq!(v.len(), 1);
-        assert_eq!(v, vec![StatusEntry{
-            merge_or_index: Status::Modified(PathBuf::from("file.txt")),
-            work_tree: Status::Deleted(PathBuf::from("file.txt")),
-        }]);
+        assert_eq!(
+            v,
+            vec![StatusEntry {
+                merge_or_index: Status::Modified(PathBuf::from("file.txt")),
+                work_tree: Status::Deleted(PathBuf::from("file.txt")),
+            }]
+        );
     }
 
     #[test]
     fn test_status_lines_to_entries_copied_right() {
-        let r = status_lines_to_entries(vec![
-            " C new.txt",
-            "old.txt"
-        ].into_iter());
+        let r = status_lines_to_entries(vec![" C new.txt", "old.txt"].into_iter());
         assert!(r.is_ok());
         let v = r.unwrap();
         assert_eq!(v.len(), 1);
-        assert_eq!(v, vec![StatusEntry{
-            merge_or_index: Status::Clean(PathBuf::from("new.txt")),
-            work_tree: Status::Copied{
-                new: PathBuf::from("new.txt"),
-                old: PathBuf::from("old.txt"),
-            },
-        }]);
+        assert_eq!(
+            v,
+            vec![StatusEntry {
+                merge_or_index: Status::Clean(PathBuf::from("new.txt")),
+                work_tree: Status::Copied {
+                    new: PathBuf::from("new.txt"),
+                    old: PathBuf::from("old.txt"),
+                },
+            }]
+        );
     }
 
     #[test]
     fn test_status_lines_to_entries_copied_left() {
-        let r = status_lines_to_entries(vec![
-            "C  new.txt",
-            "old.txt"
-        ].into_iter());
+        let r = status_lines_to_entries(vec!["C  new.txt", "old.txt"].into_iter());
         assert!(r.is_ok());
         let v = r.unwrap();
         assert_eq!(v.len(), 1);
-        assert_eq!(v, vec![StatusEntry{
-            merge_or_index: Status::Copied{
-                new: PathBuf::from("new.txt"),
-                old: PathBuf::from("old.txt"),
-            },
-            work_tree: Status::Clean(PathBuf::from("new.txt")),
-        }]);
+        assert_eq!(
+            v,
+            vec![StatusEntry {
+                merge_or_index: Status::Copied {
+                    new: PathBuf::from("new.txt"),
+                    old: PathBuf::from("old.txt"),
+                },
+                work_tree: Status::Clean(PathBuf::from("new.txt")),
+            }]
+        );
     }
 
     #[test]
     fn test_status_lines_to_entries_renamed_right() {
-        let r = status_lines_to_entries(vec![
-            " R new.txt",
-            "old.txt"
-        ].into_iter());
+        let r = status_lines_to_entries(vec![" R new.txt", "old.txt"].into_iter());
         assert!(r.is_ok());
         let v = r.unwrap();
         assert_eq!(v.len(), 1);
-        assert_eq!(v, vec![StatusEntry{
-            merge_or_index: Status::Clean(PathBuf::from("new.txt")),
-            work_tree: Status::Renamed{
-                new: PathBuf::from("new.txt"),
-                old: PathBuf::from("old.txt"),
-            },
-        }]);
+        assert_eq!(
+            v,
+            vec![StatusEntry {
+                merge_or_index: Status::Clean(PathBuf::from("new.txt")),
+                work_tree: Status::Renamed {
+                    new: PathBuf::from("new.txt"),
+                    old: PathBuf::from("old.txt"),
+                },
+            }]
+        );
     }
 
     #[test]
     fn test_status_lines_to_entries_renamed_left() {
-        let r = status_lines_to_entries(vec![
-            "R  new.txt",
-            "old.txt"
-        ].into_iter());
+        let r = status_lines_to_entries(vec!["R  new.txt", "old.txt"].into_iter());
         assert!(r.is_ok());
         let v = r.unwrap();
         assert_eq!(v.len(), 1);
-        assert_eq!(v, vec![StatusEntry{
-            merge_or_index: Status::Renamed{
-                new: PathBuf::from("new.txt"),
-                old: PathBuf::from("old.txt"),
-            },
-            work_tree: Status::Clean(PathBuf::from("new.txt")),
-        }]);
+        assert_eq!(
+            v,
+            vec![StatusEntry {
+                merge_or_index: Status::Renamed {
+                    new: PathBuf::from("new.txt"),
+                    old: PathBuf::from("old.txt"),
+                },
+                work_tree: Status::Clean(PathBuf::from("new.txt")),
+            }]
+        );
     }
-
 
     #[test]
     fn test_status_lines_to_entries_truncated_expecting_second_line() {
-        let r = status_lines_to_entries(vec![
-            " C file.txt", // should be followd by another line
-        ].into_iter());
+        let r = status_lines_to_entries(
+            vec![
+                " C file.txt", // should be followd by another line
+            ]
+            .into_iter(),
+        );
         assert!(r.is_err());
 
-        let r = status_lines_to_entries(vec![
-            " R file.txt", // should be followd by another line
-        ].into_iter());
+        let r = status_lines_to_entries(
+            vec![
+                " R file.txt", // should be followd by another line
+            ]
+            .into_iter(),
+        );
         assert!(r.is_err());
     }
 
