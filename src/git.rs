@@ -7,7 +7,7 @@ use std::process::Command;
 /// The possible states a file can be in.
 ///
 /// See also: StatusEntry
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     Modified(PathBuf),
     Added(PathBuf),
@@ -123,21 +123,26 @@ fn make_status(status: &str, rest: &str, next_line: Option<&str>) -> Result<Stat
         "M" => Ok(Status::Modified(PathBuf::from(rest))),
         "A" => Ok(Status::Added(PathBuf::from(rest))),
         "D" => Ok(Status::Deleted(PathBuf::from(rest))),
-        "R" => Ok(Status::Renamed{
+        "R" => Ok(Status::Renamed {
             new: PathBuf::from(rest),
             old: PathBuf::from(next_line.unwrap()),
         }),
-        "C" => Ok(Status::Copied{
+        "C" => Ok(Status::Copied {
             new: PathBuf::from(rest),
             old: PathBuf::from(next_line.unwrap()),
         }),
         "U" => Ok(Status::UpdatedUnMerged(PathBuf::from(rest))),
         "?" => Ok(Status::Untracked(PathBuf::from(rest))),
-        _ => Err(format_err!("unrecognized status: {}", status))
+        _ => Err(format_err!("unrecognized status: {}", status)),
     }
 }
 
-fn make_status_entry(x: &str, y: &str, rest: &str, next_line: Option<&str>) -> Result<StatusEntry, Error> {
+fn make_status_entry(
+    x: &str,
+    y: &str,
+    rest: &str,
+    next_line: Option<&str>,
+) -> Result<StatusEntry, Error> {
     bail!("not impl")
 }
 
@@ -155,7 +160,12 @@ where
     let mut maybe_partial_status: Option<XYRest> = None;
     for line in lines {
         if let Some(partial_status) = maybe_partial_status {
-            entries.push(make_status_entry(&partial_status.x, &partial_status.y, &partial_status.rest, Some(line))?);
+            entries.push(make_status_entry(
+                &partial_status.x,
+                &partial_status.y,
+                &partial_status.rest,
+                Some(line),
+            )?);
             maybe_partial_status = None;
         } else {
             let capture = status_regex()
@@ -166,7 +176,11 @@ where
             let rest = capture.name("rest").unwrap().as_str();
 
             if x == "C" || x == "R" || y == "C" || y == "R" {
-                maybe_partial_status = Some(XYRest{x: x.to_owned(), y: y.to_owned(), rest: rest.to_owned()})
+                maybe_partial_status = Some(XYRest {
+                    x: x.to_owned(),
+                    y: y.to_owned(),
+                    rest: rest.to_owned(),
+                })
             } else {
                 entries.push(make_status_entry(x, y, rest, None)?);
             }
@@ -209,17 +223,23 @@ mod tests {
 
         let s = make_status("R", "newpath", Some("oldpath"));
         assert!(s.is_ok());
-        assert_eq!(s.unwrap(), Status::Renamed{
-            new: PathBuf::from("newpath"),
-            old: PathBuf::from("oldpath"),
-        });
+        assert_eq!(
+            s.unwrap(),
+            Status::Renamed {
+                new: PathBuf::from("newpath"),
+                old: PathBuf::from("oldpath"),
+            }
+        );
 
         let s = make_status("C", "newpath", Some("oldpath"));
         assert!(s.is_ok());
-        assert_eq!(s.unwrap(), Status::Copied{
-            new: PathBuf::from("newpath"),
-            old: PathBuf::from("oldpath"),
-        });
+        assert_eq!(
+            s.unwrap(),
+            Status::Copied {
+                new: PathBuf::from("newpath"),
+                old: PathBuf::from("oldpath"),
+            }
+        );
 
         let s = make_status("?", "path", None);
         assert!(s.is_ok());
