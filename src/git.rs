@@ -117,6 +117,25 @@ impl Git for SystemGit {
     }
 }
 
+fn make_status(status: &str, rest: &str, next_line: Option<&str>) -> Result<Status, Error> {
+    match status {
+        "M" => Ok(Status::Modified(PathBuf::from(rest))),
+        "A" => Ok(Status::Added(PathBuf::from(rest))),
+        "D" => Ok(Status::Deleted(PathBuf::from(rest))),
+        "R" => Ok(Status::Renamed{
+            new: PathBuf::from(rest),
+            old: PathBuf::from(next_line.unwrap()),
+        }),
+        "C" => Ok(Status::Copied{
+            new: PathBuf::from(rest),
+            old: PathBuf::from(next_line.unwrap()),
+        }),
+        "U" => Ok(Status::UpdatedUnMerged(PathBuf::from(rest))),
+        "?" => Ok(Status::Untracked(PathBuf::from(rest))),
+        _ => Err(format_err!("unrecognized status: {}", status))
+    }
+}
+
 fn make_status_entry(x: &str, y: &str, rest: &str, next_line: Option<&str>) -> Result<StatusEntry, Error> {
     bail!("not impl")
 }
