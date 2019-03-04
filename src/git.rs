@@ -106,13 +106,6 @@ impl Git for SystemGit {
 
         let stdout = String::from_utf8(output.stdout)?;
 
-        // In short, for statuses other than renamed/copied we expect:
-        //
-        //    <STATUS FLAG OR SPACE> <STATUS FLAG> <SPACE> <ANY CHARS EXCEPT NUL REPEATED> NUL
-        //
-        // For renamed/copied statuses, an additional <ANY CHARS EXCEPT NUL> NUL is used.
-        //
-        // See git-status(1) for more.
         let lines: Vec<&str> = stdout.split('\0').collect();
 
         status_lines_to_entries(lines.into_iter())
@@ -150,6 +143,23 @@ fn make_status_entry(
     })
 }
 
+/// Given a sequence of lines (obtained from `git status -z`), produce the corresponding set of
+/// status entries.
+///
+/// In short, for statuses other than renamed/copied we expect:
+///
+///    <STATUS FLAG OR SPACE> <STATUS FLAG> <SPACE> <ANY CHARS EXCEPT NUL REPEATED> NUL
+///
+/// For renamed/copied statuses, an additional <ANY CHARS EXCEPT NUL> NUL is used.
+///
+/// Example:
+///   MM modified.txt
+///    M modified_in_worktree.txt
+///   ?? untracked.txt
+///    R newfile.txt
+///   oldfile.txt
+///
+/// See git-status(1) for more.
 fn status_lines_to_entries<'a, I>(lines: I) -> Result<Vec<StatusEntry>, Error>
 where
     I: Iterator<Item = &'a str>,
@@ -262,6 +272,9 @@ mod tests {
         let s = make_status("random", "path", None);
         assert!(s.is_err());
     }
+
+    #[test]
+    fn test_status_lines_to_entries() {}
 
     #[test]
     fn status_regex_correct() {
