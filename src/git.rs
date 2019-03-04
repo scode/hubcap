@@ -7,6 +7,7 @@ use std::process::Command;
 /// The possible states a file can be in.
 ///
 /// See also: StatusEntry
+#[derive(Clone,Debug,PartialEq)]
 pub enum Status {
     Modified(PathBuf),
     Added(PathBuf),
@@ -191,6 +192,42 @@ fn path_to_str(p: &Path) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_make_status() {
+        let s = make_status("M", "path", None);
+        assert!(s.is_ok());
+        assert_eq!(s.unwrap(), Status::Modified(PathBuf::from("path")));
+
+        let s = make_status("A", "path", None);
+        assert!(s.is_ok());
+        assert_eq!(s.unwrap(), Status::Added(PathBuf::from("path")));
+
+        let s = make_status("D", "path", None);
+        assert!(s.is_ok());
+        assert_eq!(s.unwrap(), Status::Deleted(PathBuf::from("path")));
+
+        let s = make_status("R", "newpath", Some("oldpath"));
+        assert!(s.is_ok());
+        assert_eq!(s.unwrap(), Status::Renamed{
+            new: PathBuf::from("newpath"),
+            old: PathBuf::from("oldpath"),
+        });
+
+        let s = make_status("C", "newpath", Some("oldpath"));
+        assert!(s.is_ok());
+        assert_eq!(s.unwrap(), Status::Copied{
+            new: PathBuf::from("newpath"),
+            old: PathBuf::from("oldpath"),
+        });
+
+        let s = make_status("?", "path", None);
+        assert!(s.is_ok());
+        assert_eq!(s.unwrap(), Status::Untracked(PathBuf::from("path")));
+
+        let s = make_status("random", "path", None);
+        assert!(s.is_err());
+    }
 
     #[test]
     fn status_regex_correct() {
