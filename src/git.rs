@@ -156,6 +156,12 @@ where
 {
     let mut entries: Vec<StatusEntry> = Vec::new();
 
+    // This function isn't a straight forward use of map because of the potential for an "entry" to span two
+    // lines (renames and copies). We keep an optional previous line around, whose presence indicates we are
+    // processing either a rename or a copy, in which case we must defer our call to make_status_entry() until
+    // we have read the follow-up line.
+    //
+    // XXX(scode): There's almost certainly a more idiomatic implementation of this using combinators. Sorry people.
     struct XYRest {
         x: String,
         y: String,
@@ -189,6 +195,10 @@ where
                 entries.push(make_status_entry(x, y, rest, None)?);
             }
         }
+    }
+
+    if maybe_partial_status.is_some() {
+        bail!("encountered renamed/copied status wiht no subsequent follow-up line");
     }
 
     Ok(entries)
