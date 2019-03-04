@@ -42,6 +42,7 @@ pub trait Git {
 
 /// An implementation of the Git trait which uses a git binary present on the system to interact
 /// with a git repository.
+#[derive(Default)]
 pub struct SystemGit {
     /// The path of the git binary to execute.
     git_path: PathBuf,
@@ -143,7 +144,10 @@ fn make_status_entry(
     rest: &str,
     next_line: Option<&str>,
 ) -> Result<StatusEntry, Error> {
-    bail!("not impl")
+    Ok(StatusEntry {
+        merge_or_index: make_status(x, rest, next_line)?,
+        work_tree: make_status(y, rest, next_line)?,
+    })
 }
 
 fn status_lines_to_entries<'a, I>(lines: I) -> Result<Vec<StatusEntry>, Error>
@@ -170,7 +174,7 @@ where
         } else {
             let capture = status_regex()
                 .captures(line)
-                .ok_or(format_err!("unexpected git status line: {}", line))?;
+                .ok_or_else(|| format_err!("unexpected git status line: {}", line))?;
             let x = capture.name("x").unwrap().as_str();
             let y = capture.name("y").unwrap().as_str();
             let rest = capture.name("rest").unwrap().as_str();
@@ -200,7 +204,7 @@ fn status_regex() -> Regex {
 fn path_to_str(p: &Path) -> Result<String, Error> {
     p.to_str()
         .ok_or_else(|| format_err!("path is not valid utf-8: {:?}", p))
-        .map(|s| s.to_owned())
+        .map(std::borrow::ToOwned::to_owned)
 }
 
 #[cfg(test)]
