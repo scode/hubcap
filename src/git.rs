@@ -203,9 +203,12 @@ where
             )?);
             maybe_partial_status = None;
         } else {
-            let capture = status_regex()
-                .captures(line)
-                .ok_or_else(|| format_err!("unexpected git status line (does not match regex): [{}]", line))?;
+            let capture = status_regex().captures(line).ok_or_else(|| {
+                format_err!(
+                    "unexpected git status line (does not match regex): [{}]",
+                    line
+                )
+            })?;
             let x = capture.name("x").unwrap().as_str();
             let y = capture.name("y").unwrap().as_str();
             let rest = capture.name("rest").unwrap().as_str();
@@ -257,7 +260,12 @@ mod tests {
 
         // An entirely clean working copy (catch special case of git status returning no output).
         {
-            Command::new("git").arg("-C").arg(tmp_path).arg("init").output().expect("failed to git init");
+            Command::new("git")
+                .arg("-C")
+                .arg(tmp_path)
+                .arg("init")
+                .output()
+                .expect("failed to git init");
             let status = git.status().unwrap();
             assert_eq!(status.len(), 0)
         }
@@ -268,12 +276,14 @@ mod tests {
 
             let status = git.status().unwrap();
             assert_eq!(status.len(), 1);
-            assert_eq!(status[0], StatusEntry {
-                merge_or_index: Status::Untracked(PathBuf::from("testfile")),
-                work_tree: Status::Untracked(PathBuf::from("testfile")),
-            })
+            assert_eq!(
+                status[0],
+                StatusEntry {
+                    merge_or_index: Status::Untracked(PathBuf::from("testfile")),
+                    work_tree: Status::Untracked(PathBuf::from("testfile")),
+                }
+            )
         }
-
 
         tmp_dir.close().unwrap();
     }
