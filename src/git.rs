@@ -175,10 +175,9 @@ fn make_status_entry(
 ///   oldfile.txt
 ///
 /// See git-status(1) for more.
-fn status_lines_to_entries<'a, I>(lines: I) -> Result<Vec<StatusEntry>, Error>
-where
-    I: IntoIterator<Item = &'a str>,
-{
+fn status_lines_to_entries<'a>(
+    lines: impl IntoIterator<Item = &'a str>,
+) -> Result<Vec<StatusEntry>, Error> {
     let mut entries: Vec<StatusEntry> = Vec::new();
 
     // This function isn't a straight forward use of map because of the potential for an "entry" to span two
