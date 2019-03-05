@@ -117,8 +117,11 @@ impl Git for SystemGit {
 
         let stdout = String::from_utf8(output.stdout)?;
 
-        let lines: Vec<&str> = stdout.split('\0').collect();
-
+        let mut lines: Vec<&str> = stdout.split('\0').collect();
+        if *lines.last().unwrap() != "" {
+            bail!("expected trailing zero in git status output; got none")
+        }
+        lines.pop();
         status_lines_to_entries(lines.into_iter())
     }
 }
@@ -202,7 +205,7 @@ where
         } else {
             let capture = status_regex()
                 .captures(line)
-                .ok_or_else(|| format_err!("unexpected git status line: {}", line))?;
+                .ok_or_else(|| format_err!("unexpected git status line (does not match regex): [{}]", line))?;
             let x = capture.name("x").unwrap().as_str();
             let y = capture.name("y").unwrap().as_str();
             let rest = capture.name("rest").unwrap().as_str();
@@ -227,7 +230,7 @@ where
 }
 
 fn status_regex() -> Regex {
-    Regex::new(r"^(?P<x>[ MADRCU])(?P<y>[ MADRCU]) (?P<rest>.*)$").unwrap()
+    Regex::new(r"^(?P<x>[ MADRCU?])(?P<y>[ MADRCU?]) (?P<rest>.*)$").unwrap()
 }
 
 /// Convert a Path to a String, failing with an error if the string is not valid utf-8.
@@ -242,6 +245,38 @@ fn path_to_str(p: &Path) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use tempdir;
+
+    #[test]
+    fn test_system_git_status() {
+        let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
+        let tmp_path = tmp_dir.path();
+        let mut git = SystemGit::new();
+        git.repo_path(tmp_path);
+
+        // An entirely clean working copy (catch special case of git status returning no output).
+        {
+            Command::new("git").arg("-C").arg(tmp_path).arg("init").output().expect("failed to git init");
+            let status = git.status().unwrap();
+            assert_eq!(status.len(), 0)
+        }
+
+        // Non-empty status output (untracked file).
+        {
+            File::create(tmp_path.join("testfile")).unwrap();
+
+            let status = git.status().unwrap();
+            assert_eq!(status.len(), 1);
+            assert_eq!(status[0], StatusEntry {
+                merge_or_index: Status::Untracked(PathBuf::from("testfile")),
+                work_tree: Status::Untracked(PathBuf::from("testfile")),
+            })
+        }
+
+
+        tmp_dir.close().unwrap();
+    }
 
     #[test]
     fn test_make_status() {
@@ -290,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_status_lines_to_entries_empty() {
+    fn test_status_lines_to_entries_empty_vec() {
         let r = status_lines_to_entries(vec![].into_iter());
         assert!(r.is_ok());
         assert!(r.unwrap().len() == 0);
@@ -413,6 +448,15 @@ mod tests {
         assert!(status_regex().captures("AMM fname").is_none());
         assert!(status_regex().captures("AM").is_none());
         assert!(status_regex().captures("AM").is_none());
+
+        status_regex().captures("?? file").unwrap();
+        status_regex().captures("MM file").unwrap();
+        status_regex().captures("AA file").unwrap();
+        status_regex().captures("DD file").unwrap();
+        status_regex().captures("RR file").unwrap();
+        status_regex().captures("CC file").unwrap();
+        status_regex().captures("UU file").unwrap();
+        status_regex().captures("   file").unwrap();
     }
 
     #[test]
