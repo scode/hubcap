@@ -122,7 +122,7 @@ impl Git for SystemGit {
             bail!("expected trailing zero in git status output; got none")
         }
         lines.pop();
-        status_lines_to_entries(lines.into_iter())
+        status_lines_to_entries(lines)
     }
 }
 
@@ -177,7 +177,7 @@ fn make_status_entry(
 /// See git-status(1) for more.
 fn status_lines_to_entries<'a, I>(lines: I) -> Result<Vec<StatusEntry>, Error>
 where
-    I: Iterator<Item = &'a str>,
+    I: IntoIterator<Item = &'a str>,
 {
     let mut entries: Vec<StatusEntry> = Vec::new();
 
