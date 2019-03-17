@@ -43,6 +43,9 @@ pub struct StatusEntry {
 }
 
 pub trait Git {
+    // Call "git init".
+    fn init(&self) -> Result<(), Error>;
+
     /// Inspect the status of the working copy and return a description of it.
     ///
     /// This is the equivalent of `git status`.
@@ -101,6 +104,23 @@ impl SystemGit {
 }
 
 impl Git for SystemGit {
+    fn init(&self) -> Result<(), Error> {
+        let mut cmd = self.git_command()?;
+
+        cmd.arg("init").arg("-q");
+
+        let output = cmd.output()?;
+
+        if !output.status.success() {
+            return Err(format_err!(
+                "git init failed: {}",
+                String::from_utf8(output.stderr)?
+            ));
+        }
+
+        return Ok(());
+    }
+
     fn status(&self) -> Result<Vec<StatusEntry>, Error> {
         let mut cmd = self.git_command()?;
 
@@ -249,6 +269,19 @@ mod tests {
     use super::*;
     use std::fs::File;
     use tempdir;
+
+    #[test]
+    fn test_git_init() {
+        let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
+        let tmp_path = tmp_dir.path();
+        let mut git = SystemGit::new();
+        git.repo_path(tmp_path);
+
+        assert!(!tmp_path.join(".git").exists());
+
+        git.init().expect("git init failed");
+        assert!(tmp_path.join(".git").exists());
+    }
 
     #[test]
     fn test_system_git_status() {
