@@ -42,6 +42,33 @@ pub struct StatusEntry {
     pub work_tree: Status,
 }
 
+pub struct ResolvedRef {
+    name: String,
+    sha: String,
+}
+
+impl ResolvedRef {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn sha(&self) -> &str {
+        &self.sha
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum InterpretedRef {
+    Head(),
+    Tag(String),
+    LocalBranch(String),
+    RemoteBranch { origin: String, name: String },
+}
+
+pub fn interpret_ref_name<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error> {
+    Err(format_err!("not impl")
+}
+
 pub trait Git {
     // Call "git init".
     fn init(&self) -> Result<(), Error>;
@@ -519,5 +546,32 @@ mod tests {
         let pb = PathBuf::from(osstr);
 
         assert!(path_to_str(&pb).is_err())
+    }
+
+    #[test]
+    fn test_interpret_ref_name_unrecognized() {
+        assert!(interpret_ref_name("random").is_err());
+    }
+
+    #[test]
+    fn test_interpret_ref_name_head() {
+        assert_eq!(interpret_ref_name("HEAD").unwrap(), InterpretedRef::Head());
+    }
+
+    #[test]
+    fn test_interpret_ref_name_tag() {
+        assert_eq!(interpret_ref_name("refs/tags/tagname").unwrap(), InterpretedRef::Tag("tagname".into()));
+        assert_eq!(interpret_ref_name("refs/tags/tag/name").unwrap(), InterpretedRef::Tag("tagn/ame".into()));
+    }
+
+    #[test]
+    fn test_interpret_ref_name_local_branch() {
+        assert_eq!(interpret_ref_name("refs/heads/branch").unwrap(), InterpretedRef::LocalBranch("branch".into()));
+        assert_eq!(interpret_ref_name("refs/heads/branch/name").unwrap(), InterpretedRef::LocalBranch("branch/name".into()));
+    }
+
+    #[test]
+    fn test_interpret_ref_name_remote_branch() {
+        assert_eq!(interpret_ref_name("refs/remotes/origin/branch/name").unwrap(), InterpretedRef::RemoteBranch{origin: "origin".into(), name: "branch/name".into()});
     }
 }
