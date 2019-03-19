@@ -182,7 +182,7 @@ impl Git for SystemGit {
             ));
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn status(&self) -> Result<Vec<StatusEntry>, Error> {
