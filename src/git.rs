@@ -123,6 +123,19 @@ pub enum InterpretedRef {
 /// See InterpretedRef and its comments for what we consider to be valid refs.
 ///
 /// We return an error if we cannot recognize the ref.
+///
+/// ```
+/// # use hubcap::git::interpret_ref_name;
+/// # use hubcap::git::InterpretedRef;
+/// assert_eq!(interpret_ref_name("HEAD").unwrap(), InterpretedRef::Head());
+/// assert_eq!(interpret_ref_name("refs/heads/master").unwrap(), InterpretedRef::LocalBranch("master".into()));
+/// assert_eq!(interpret_ref_name("refs/heads/my/branch").unwrap(), InterpretedRef::LocalBranch("my/branch".into()));
+/// assert_eq!(interpret_ref_name("refs/tags/v1.0.0").unwrap(), InterpretedRef::Tag("v1.0.0".into()));
+/// assert_eq!(interpret_ref_name("refs/tags/betas/v1.0.0-b1").unwrap(), InterpretedRef::Tag("betas/v1.0.0-b1".into()));
+/// assert_eq!(interpret_ref_name("refs/remotes/origin/master").unwrap(), InterpretedRef::RemoteBranch{remote: "origin".into(), name: "master".into()});
+/// assert_eq!(interpret_ref_name("refs/remotes/upstream/some/branch").unwrap(), InterpretedRef::RemoteBranch{remote: "upstream".into(), name: "some/branch".into()});
+/// assert!(interpret_ref_name("invalid").is_err());
+/// ```
 pub fn interpret_ref_name<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error> {
     // Should consider using lazy_static crate to cache.
     let re = Regex::new(r"^(?P<head>HEAD)|refs/tags/(?P<tag>.*)|refs/heads/(?P<localbranch>.*)|refs/remotes/(?P<remote>[^/]+)/(?P<remotebranch>.*)$").unwrap();
