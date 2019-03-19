@@ -79,19 +79,50 @@ impl ResolvedRef {
 pub enum InterpretedRef {
     /// The special HEAD ref (see also: git show-ref --head). This typically indicates the current branch
     /// unless the repo is in a detached head state.
+    ///
+    /// Examples (only one possibility):
+    ///
+    /// ```text
+    /// HEAD
+    /// ```
     Head(),
 
     /// A tag by the given name.
+    ///
+    /// Example refs:
+    ///
+    /// ```text
+    /// refs/tags/v1.0.0 -> Tag(v1.0.0)
+    /// refs/tags/my/tag -> Tag(my/tag)
+    /// ```
     Tag(String),
 
     /// A local branch.
+    ///
+    /// Example refs:
+    ///
+    /// ```text
+    /// refs/heads/master -> LocalBranch(master)
+    /// refs/heads/my/branch -> LocalBranch(my/branch)
+    /// ```
     LocalBranch(String),
 
     /// A remote branch by the given name on the given remote.
     ///
+    /// Example refs:
+    ///
+    /// ```text
+    /// refs/remotes/origin/master -> RemoteBranch(origin, master)
+    /// refs/remotes/upstream/some/branch -> RemoteBranch(upstream, some/branch)
+    /// ```
     RemoteBranch { remote: String, name: String },
 }
 
+/// Interpret a ref name if possible.
+///
+/// See InterpretedRef and its comments for what we consider to be valid refs.
+///
+/// We return an error if we cannot recognize the ref.
 pub fn interpret_ref_name<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error> {
     // Should consider using lazy_static crate to cache.
     let re = Regex::new(r"^(?P<head>HEAD)|refs/tags/(?P<tag>.*)|refs/heads/(?P<localbranch>.*)|refs/remotes/(?P<remote>[^/]+)/(?P<remotebranch>.*)$").unwrap();
