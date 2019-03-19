@@ -42,16 +42,34 @@ pub struct StatusEntry {
     pub work_tree: Status,
 }
 
+/// A ref and its associated sha (hash value).
 pub struct ResolvedRef {
     name: String,
     sha: String,
 }
 
 impl ResolvedRef {
+    /// Return the name of the ref.
+    ///
+    /// Example ref names include:
+    ///
+    /// ```text
+    /// HEAD
+    /// refs/heads/master
+    /// refs/heads/my-branch
+    /// refs/tags/a-tag
+    /// refs/remotes/origin/my-branch
+    /// ```
+    ///
+    /// For assistance in interpreting a ref name, see interpret_ref_name().
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Return the sha the ref refers to.
+    ///
+    /// The name "sha" is used only because it is the colloquial name, and isn't meant to imply
+    /// anything about the choice of hashing algorithm by git.
     pub fn sha(&self) -> &str {
         &self.sha
     }
@@ -59,9 +77,18 @@ impl ResolvedRef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum InterpretedRef {
+    /// The special HEAD ref (see also: git show-ref --head). This typically indicates the current branch
+    /// unless the repo is in a detached head state.
     Head(),
+
+    /// A tag by the given name.
     Tag(String),
+
+    /// A local branch.
     LocalBranch(String),
+
+    /// A remote branch by the given name on the given remote.
+    ///
     RemoteBranch { remote: String, name: String },
 }
 
