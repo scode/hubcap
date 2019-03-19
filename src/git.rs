@@ -61,7 +61,7 @@ impl ResolvedRef {
     /// refs/remotes/origin/my-branch
     /// ```
     ///
-    /// For assistance in interpreting a ref name, see interpret_ref_name().
+    /// For assistance in interpreting a ref name, see interpret_ref().
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -125,18 +125,18 @@ pub enum InterpretedRef {
 /// We return an error if we cannot recognize the ref.
 ///
 /// ```
-/// # use hubcap::git::interpret_ref_name;
+/// # use hubcap::git::interpret_ref;
 /// # use hubcap::git::InterpretedRef;
-/// assert_eq!(interpret_ref_name("HEAD").unwrap(), InterpretedRef::Head());
-/// assert_eq!(interpret_ref_name("refs/heads/master").unwrap(), InterpretedRef::LocalBranch("master".into()));
-/// assert_eq!(interpret_ref_name("refs/heads/my/branch").unwrap(), InterpretedRef::LocalBranch("my/branch".into()));
-/// assert_eq!(interpret_ref_name("refs/tags/v1.0.0").unwrap(), InterpretedRef::Tag("v1.0.0".into()));
-/// assert_eq!(interpret_ref_name("refs/tags/betas/v1.0.0-b1").unwrap(), InterpretedRef::Tag("betas/v1.0.0-b1".into()));
-/// assert_eq!(interpret_ref_name("refs/remotes/origin/master").unwrap(), InterpretedRef::RemoteBranch{remote: "origin".into(), name: "master".into()});
-/// assert_eq!(interpret_ref_name("refs/remotes/upstream/some/branch").unwrap(), InterpretedRef::RemoteBranch{remote: "upstream".into(), name: "some/branch".into()});
-/// assert!(interpret_ref_name("invalid").is_err());
+/// assert_eq!(interpret_ref("HEAD").unwrap(), InterpretedRef::Head());
+/// assert_eq!(interpret_ref("refs/heads/master").unwrap(), InterpretedRef::LocalBranch("master".into()));
+/// assert_eq!(interpret_ref("refs/heads/my/branch").unwrap(), InterpretedRef::LocalBranch("my/branch".into()));
+/// assert_eq!(interpret_ref("refs/tags/v1.0.0").unwrap(), InterpretedRef::Tag("v1.0.0".into()));
+/// assert_eq!(interpret_ref("refs/tags/betas/v1.0.0-b1").unwrap(), InterpretedRef::Tag("betas/v1.0.0-b1".into()));
+/// assert_eq!(interpret_ref("refs/remotes/origin/master").unwrap(), InterpretedRef::RemoteBranch{remote: "origin".into(), name: "master".into()});
+/// assert_eq!(interpret_ref("refs/remotes/upstream/some/branch").unwrap(), InterpretedRef::RemoteBranch{remote: "upstream".into(), name: "some/branch".into()});
+/// assert!(interpret_ref("invalid").is_err());
 /// ```
-pub fn interpret_ref_name<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error> {
+pub fn interpret_ref<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error> {
     // Should consider using lazy_static crate to cache.
     let re = Regex::new(r"^(?P<head>HEAD)|refs/tags/(?P<tag>.*)|refs/heads/(?P<localbranch>.*)|refs/remotes/(?P<remote>[^/]+)/(?P<remotebranch>.*)$").unwrap();
     let capture = re
@@ -658,43 +658,43 @@ mod tests {
     }
 
     #[test]
-    fn test_interpret_ref_name_unrecognized() {
-        assert!(interpret_ref_name("random").is_err());
+    fn test_interpret_ref_unrecognized() {
+        assert!(interpret_ref("random").is_err());
     }
 
     #[test]
-    fn test_interpret_ref_name_head() {
-        assert_eq!(interpret_ref_name("HEAD").unwrap(), InterpretedRef::Head());
+    fn test_interpret_ref_head() {
+        assert_eq!(interpret_ref("HEAD").unwrap(), InterpretedRef::Head());
     }
 
     #[test]
-    fn test_interpret_ref_name_tag() {
+    fn test_interpret_ref_tag() {
         assert_eq!(
-            interpret_ref_name("refs/tags/tagname").unwrap(),
+            interpret_ref("refs/tags/tagname").unwrap(),
             InterpretedRef::Tag("tagname".into())
         );
         assert_eq!(
-            interpret_ref_name("refs/tags/tag/name").unwrap(),
+            interpret_ref("refs/tags/tag/name").unwrap(),
             InterpretedRef::Tag("tag/name".into())
         );
     }
 
     #[test]
-    fn test_interpret_ref_name_local_branch() {
+    fn test_interpret_ref_local_branch() {
         assert_eq!(
-            interpret_ref_name("refs/heads/branch").unwrap(),
+            interpret_ref("refs/heads/branch").unwrap(),
             InterpretedRef::LocalBranch("branch".into())
         );
         assert_eq!(
-            interpret_ref_name("refs/heads/branch/name").unwrap(),
+            interpret_ref("refs/heads/branch/name").unwrap(),
             InterpretedRef::LocalBranch("branch/name".into())
         );
     }
 
     #[test]
-    fn test_interpret_ref_name_remote_branch() {
+    fn test_interpret_ref_remote_branch() {
         assert_eq!(
-            interpret_ref_name("refs/remotes/origin/branch/name").unwrap(),
+            interpret_ref("refs/remotes/origin/branch/name").unwrap(),
             InterpretedRef::RemoteBranch {
                 remote: "origin".into(),
                 name: "branch/name".into()
