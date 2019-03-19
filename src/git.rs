@@ -42,6 +42,141 @@ pub struct StatusEntry {
     pub work_tree: Status,
 }
 
+/// A ref and its associated sha (hash value).
+pub struct ResolvedRef {
+    name: String,
+    sha: String,
+}
+
+impl ResolvedRef {
+    /// Return the name of the ref.
+    ///
+    /// Example ref names include:
+    ///
+    /// ```text
+    /// HEAD
+    /// refs/heads/master
+    /// refs/heads/my-branch
+    /// refs/tags/a-tag
+    /// refs/remotes/origin/my-branch
+    /// ```
+    ///
+    /// For assistance in interpreting a ref name, see interpret_ref().
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the sha the ref refers to.
+    ///
+    /// The name "sha" is used only because it is the colloquial name, and isn't meant to imply
+    /// anything about the choice of hashing algorithm by git.
+    pub fn sha(&self) -> &str {
+        &self.sha
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum InterpretedRef {
+    /// The special HEAD ref (see also: git show-ref --head). This typically indicates the current branch
+    /// unless the repo is in a detached head state.
+    ///
+    /// Examples (only one possibility):
+    ///
+    /// ```text
+    /// HEAD
+    /// ```
+    Head(),
+
+    /// A tag by the given name.
+    ///
+    /// Example refs:
+    ///
+    /// ```text
+    /// refs/tags/v1.0.0 -> Tag(v1.0.0)
+    /// refs/tags/my/tag -> Tag(my/tag)
+    /// ```
+    Tag(String),
+
+    /// A local branch.
+    ///
+    /// Example refs:
+    ///
+    /// ```text
+    /// refs/heads/master -> LocalBranch(master)
+    /// refs/heads/my/branch -> LocalBranch(my/branch)
+    /// ```
+    LocalBranch(String),
+
+    /// A remote branch by the given name on the given remote.
+    ///
+    /// Example refs:
+    ///
+    /// ```text
+    /// refs/remotes/origin/master -> RemoteBranch(origin, master)
+    /// refs/remotes/upstream/some/branch -> RemoteBranch(upstream, some/branch)
+    /// ```
+    RemoteBranch { remote: String, name: String },
+}
+
+/// Interpret a ref name if possible.
+///
+/// See InterpretedRef and its comments for what we consider to be valid refs.
+///
+/// We return an error if we cannot recognize the ref.
+///
+/// ```
+/// # use hubcap::git::interpret_ref;
+/// # use hubcap::git::InterpretedRef;
+/// assert_eq!(interpret_ref("HEAD").unwrap(), InterpretedRef::Head());
+/// assert_eq!(interpret_ref("refs/heads/master").unwrap(), InterpretedRef::LocalBranch("master".into()));
+/// assert_eq!(interpret_ref("refs/heads/my/branch").unwrap(), InterpretedRef::LocalBranch("my/branch".into()));
+/// assert_eq!(interpret_ref("refs/tags/v1.0.0").unwrap(), InterpretedRef::Tag("v1.0.0".into()));
+/// assert_eq!(interpret_ref("refs/tags/betas/v1.0.0-b1").unwrap(), InterpretedRef::Tag("betas/v1.0.0-b1".into()));
+/// assert_eq!(interpret_ref("refs/remotes/origin/master").unwrap(), InterpretedRef::RemoteBranch{remote: "origin".into(), name: "master".into()});
+/// assert_eq!(interpret_ref("refs/remotes/upstream/some/branch").unwrap(), InterpretedRef::RemoteBranch{remote: "upstream".into(), name: "some/branch".into()});
+/// assert!(interpret_ref("invalid").is_err());
+/// ```
+pub fn interpret_ref<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error> {
+    // Should consider using lazy_static crate to cache.
+    let re = Regex::new(r"^(?P<head>HEAD)|refs/tags/(?P<tag>.*)|refs/heads/(?P<localbranch>.*)|refs/remotes/(?P<remote>[^/]+)/(?P<remotebranch>.*)$").unwrap();
+    let capture = re
+        .captures(ref_name.as_ref())
+        .ok_or_else(|| format_err!("could not interpret ref: [{}]", ref_name.as_ref()))?;
+
+    let head = capture.name("head");
+    if head.is_some() {
+        return Ok(InterpretedRef::Head());
+    }
+
+    let tag = capture.name("tag");
+    if let Some(tag) = tag {
+        return Ok(InterpretedRef::Tag(tag.as_str().into()));
+    }
+
+    let local_branch = capture.name("localbranch");
+    if let Some(local_branch) = local_branch {
+        return Ok(InterpretedRef::LocalBranch(local_branch.as_str().into()));
+    }
+
+    let origin = capture.name("remote");
+    if let Some(origin) = origin {
+        match capture.name("remotebranch") {
+            Some(remote_branch) => {
+                return Ok(InterpretedRef::RemoteBranch {
+                    remote: origin.as_str().into(),
+                    name: remote_branch.as_str().into(),
+                })
+            }
+            None => return Err(format_err!("bug: rematched remote but not remotebranch")),
+        }
+    }
+
+    Err(format_err!(
+        "caould not interpret ref: {}",
+        ref_name.as_ref()
+    ))
+}
+
 pub trait Git {
     // Call "git init".
     fn init(&self) -> Result<(), Error>;
@@ -118,7 +253,7 @@ impl Git for SystemGit {
             ));
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn status(&self) -> Result<Vec<StatusEntry>, Error> {
@@ -252,6 +387,7 @@ fn status_lines_to_entries<'a>(
 }
 
 fn status_regex() -> Regex {
+    // Should consider using lazy_static crate to cache.
     Regex::new(r"^(?P<x>[ MADRCU?])(?P<y>[ MADRCU?]) (?P<rest>.*)$").unwrap()
 }
 
@@ -519,5 +655,50 @@ mod tests {
         let pb = PathBuf::from(osstr);
 
         assert!(path_to_str(&pb).is_err())
+    }
+
+    #[test]
+    fn test_interpret_ref_unrecognized() {
+        assert!(interpret_ref("random").is_err());
+    }
+
+    #[test]
+    fn test_interpret_ref_head() {
+        assert_eq!(interpret_ref("HEAD").unwrap(), InterpretedRef::Head());
+    }
+
+    #[test]
+    fn test_interpret_ref_tag() {
+        assert_eq!(
+            interpret_ref("refs/tags/tagname").unwrap(),
+            InterpretedRef::Tag("tagname".into())
+        );
+        assert_eq!(
+            interpret_ref("refs/tags/tag/name").unwrap(),
+            InterpretedRef::Tag("tag/name".into())
+        );
+    }
+
+    #[test]
+    fn test_interpret_ref_local_branch() {
+        assert_eq!(
+            interpret_ref("refs/heads/branch").unwrap(),
+            InterpretedRef::LocalBranch("branch".into())
+        );
+        assert_eq!(
+            interpret_ref("refs/heads/branch/name").unwrap(),
+            InterpretedRef::LocalBranch("branch/name".into())
+        );
+    }
+
+    #[test]
+    fn test_interpret_ref_remote_branch() {
+        assert_eq!(
+            interpret_ref("refs/remotes/origin/branch/name").unwrap(),
+            InterpretedRef::RemoteBranch {
+                remote: "origin".into(),
+                name: "branch/name".into()
+            }
+        );
     }
 }
