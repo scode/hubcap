@@ -62,11 +62,40 @@ pub enum InterpretedRef {
     Head(),
     Tag(String),
     LocalBranch(String),
-    RemoteBranch { origin: String, name: String },
+    RemoteBranch { remote: String, name: String },
 }
 
 pub fn interpret_ref_name<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error> {
-    Err(format_err!("not impl")
+    // Should consider using lazy_static crate to cache.
+    let re = Regex::new(r"^(?P<head>HEAD)|refs/tags/(?P<tag>.*)|refs/heads/(?P<localbranch>.*)|refs/remotes/(?P<remote>[^/]+)/(?P<remotebranch>.*)$").unwrap();
+    let capture = re.captures(ref_name.as_ref()).ok_or_else(|| {
+        format_err!("could not interpret ref: [{}]", ref_name.as_ref())
+    })?;
+
+    let head = capture.name("head");
+    if head.is_some() {
+        return Ok(InterpretedRef::Head());
+    }
+
+    let tag = capture.name("tag");
+    if let Some(tag) = tag {
+        return Ok(InterpretedRef::Tag(tag.as_str().into()));
+    }
+
+    let local_branch = capture.name("localbranch");
+    if let Some(local_branch) = local_branch {
+        return Ok(InterpretedRef::LocalBranch(local_branch.as_str().into()));
+    }
+
+    let origin = capture.name("remote");
+    if let Some(origin) = origin {
+        match capture.name("remotebranch") {
+            Some(remote_branch) => return Ok(InterpretedRef::RemoteBranch{remote: origin.as_str().into(), name: remote_branch.as_str().into()}),
+            None => return Err(format_err!("bug: rematched remote but not remotebranch")),
+        }
+    }
+
+    Err(format_err!("caould not interpret ref: {}", ref_name.as_ref()))
 }
 
 pub trait Git {
@@ -279,6 +308,7 @@ fn status_lines_to_entries<'a>(
 }
 
 fn status_regex() -> Regex {
+    // Should consider using lazy_static crate to cache.
     Regex::new(r"^(?P<x>[ MADRCU?])(?P<y>[ MADRCU?]) (?P<rest>.*)$").unwrap()
 }
 
@@ -561,7 +591,7 @@ mod tests {
     #[test]
     fn test_interpret_ref_name_tag() {
         assert_eq!(interpret_ref_name("refs/tags/tagname").unwrap(), InterpretedRef::Tag("tagname".into()));
-        assert_eq!(interpret_ref_name("refs/tags/tag/name").unwrap(), InterpretedRef::Tag("tagn/ame".into()));
+        assert_eq!(interpret_ref_name("refs/tags/tag/name").unwrap(), InterpretedRef::Tag("tag/name".into()));
     }
 
     #[test]
@@ -572,6 +602,6 @@ mod tests {
 
     #[test]
     fn test_interpret_ref_name_remote_branch() {
-        assert_eq!(interpret_ref_name("refs/remotes/origin/branch/name").unwrap(), InterpretedRef::RemoteBranch{origin: "origin".into(), name: "branch/name".into()});
+        assert_eq!(interpret_ref_name("refs/remotes/origin/branch/name").unwrap(), InterpretedRef::RemoteBranch{remote: "origin".into(), name: "branch/name".into()});
     }
 }
