@@ -43,6 +43,7 @@ pub struct StatusEntry {
 }
 
 /// A ref and its associated sha (hash value).
+#[derive(Clone, Debug, PartialEq)]
 pub struct ResolvedRef {
     name: String,
     sha: String,
@@ -311,6 +312,21 @@ fn make_status_entry(
         merge_or_index: make_status(x, rest, next_line)?,
         work_tree: make_status(y, rest, next_line)?,
     })
+}
+
+/// Convert a line of show-ref output into a ResolvedRef.
+fn sha_ref_to_resolved_ref<T: Into<String>>(line: T) -> Result<ResolvedRef, Error> {
+    // XXX: Would prefer iterators over array indexing for safety.
+    let s: String = line.into();
+    let v: Vec<&str> = s.split_whitespace().collect();
+    if v.len() != 2 {
+        return Err(format_err!("expected sha followed by ref name, got: {}", s));
+    }
+
+    return Ok(ResolvedRef {
+        sha: v[0].into(),
+        name: v[1].into(),
+    });
 }
 
 /// Given a sequence of lines (obtained from `git status -z`), produce the corresponding set of
@@ -700,5 +716,19 @@ mod tests {
                 name: "branch/name".into()
             }
         );
+    }
+
+    #[test]
+    fn test_sha_ref_to_resolved_ref() {
+        assert_eq!(
+            sha_ref_to_resolved_ref("abc ref/name").unwrap(),
+            ResolvedRef {
+                name: "ref/name".into(),
+                sha: "abc".into()
+            }
+        );
+        assert!(sha_ref_to_resolved_ref("").is_err());
+        assert!(sha_ref_to_resolved_ref("abc").is_err());
+        assert!(sha_ref_to_resolved_ref("abc name garbage").is_err());
     }
 }
