@@ -190,6 +190,9 @@ pub trait Git {
     fn status(&self) -> Result<Vec<StatusEntry>, Error>;
 
     /// Return all refs known to git.
+    ///
+    /// If the repo has no refs (typically a freshly initialized empty repo), an error
+    /// is returned (this is arguably unexpected, but fits the behavior of show-ref).
     fn refs(&self) -> Result<Vec<ResolvedRef>, Error>;
 }
 
@@ -757,7 +760,7 @@ mod tests {
     }
 
     #[test]
-    fn test_system_git_refs() {
+    fn test_system_git_refs_non_empty() {
         use std::io::prelude::*;
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
@@ -795,5 +798,23 @@ mod tests {
         assert_eq!(refs.len(), 2);
         assert_eq!(refs[0].name, "HEAD");
         assert_eq!(refs[1].name, "refs/heads/master");
+    }
+
+    #[test]
+    /// Test refs() on an empty repo (without a commit).
+    fn test_system_git_refs_empty() {
+        let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
+        let tmp_path = tmp_dir.path();
+        let mut git = SystemGit::new();
+        git.repo_path(tmp_path);
+
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp_path)
+            .arg("init")
+            .output()
+            .expect("failed to git init");
+
+        assert!(git.refs().is_err());
     }
 }
