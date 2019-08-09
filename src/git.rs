@@ -188,6 +188,9 @@ pub trait Git {
     ///
     /// If the git working copy is clean, an empty vec is returned.
     fn status(&self) -> Result<Vec<StatusEntry>, Error>;
+
+    /// Return all refs known to git.
+    fn refs(&self) -> Result<Vec<ResolvedRef>, Error>;
 }
 
 /// An implementation of the Git trait which uses a git binary present on the system to interact
@@ -279,6 +282,27 @@ impl Git for SystemGit {
         }
         lines.pop();
         status_lines_to_entries(lines)
+    }
+
+    fn refs(&self) -> Result<Vec<ResolvedRef>, Error> {
+        let mut cmd = self.git_command()?;
+
+        cmd.arg("show-ref").arg("--head");
+
+        let output = cmd.output()?;
+        if !output.status.success() {
+            return Err(format_err!(
+                "git show-ref terminated in error: {}",
+                String::from_utf8(output.stderr)?
+            ));
+        }
+
+        let stdout = String::from_utf8(output.stdout)?;
+
+        stdout
+            .lines()
+            .map(|line| sha_ref_to_resolved_ref(line))
+            .collect()
     }
 }
 
@@ -730,5 +754,46 @@ mod tests {
         assert!(sha_ref_to_resolved_ref("").is_err());
         assert!(sha_ref_to_resolved_ref("abc").is_err());
         assert!(sha_ref_to_resolved_ref("abc name garbage").is_err());
+    }
+
+    #[test]
+    fn test_system_git_refs() {
+        use std::io::prelude::*;
+        let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
+        let tmp_path = tmp_dir.path();
+        let mut git = SystemGit::new();
+        git.repo_path(tmp_path);
+
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp_path)
+            .arg("init")
+            .output()
+            .expect("failed to git init");
+
+        let mut f = File::create(tmp_path.join("testfile")).unwrap();
+        f.write_all("test".as_bytes()).unwrap();
+
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp_path)
+            .arg("add")
+            .arg("testfile")
+            .output()
+            .expect("failed to git init");
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp_path)
+            .arg("commit")
+            .arg("-m")
+            .arg("testcommit")
+            .arg("testfile")
+            .output()
+            .expect("failed to git init");
+
+        let refs = git.refs().unwrap();
+        assert_eq!(refs.len(), 2);
+        assert_eq!(refs[0].name, "HEAD");
+        assert_eq!(refs[1].name, "refs/heads/master");
     }
 }
