@@ -7,8 +7,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - name: build
-      run: cargo build --release
+    - name: Build
+      run: cargo build
 
-    - name: test
-      run: cargo test --verbose
+    - name: Test
+      run: cargo test
