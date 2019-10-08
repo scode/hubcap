@@ -304,7 +304,7 @@ impl Git for SystemGit {
 
         stdout
             .lines()
-            .map(|line| sha_ref_to_resolved_ref(line))
+            .map(sha_ref_to_resolved_ref)
             .collect()
     }
 }
@@ -350,10 +350,10 @@ fn sha_ref_to_resolved_ref<T: Into<String>>(line: T) -> Result<ResolvedRef, Erro
         return Err(format_err!("expected sha followed by ref name, got: {}", s));
     }
 
-    return Ok(ResolvedRef {
+    Ok(ResolvedRef {
         sha: v[0].into(),
         name: v[1].into(),
-    });
+    })
 }
 
 /// Given a sequence of lines (obtained from `git status -z`), produce the corresponding set of
