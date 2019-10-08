@@ -297,7 +297,7 @@ impl Git for SystemGit {
             return Err(format_err!(
                 "git show-ref terminated in error: stderr: {} stdout: {}",
                 String::from_utf8(output.stderr)?,
-                String::from_utf(output.stdout)?,
+                String::from_utf8(output.stdout)?,
             ));
         }
 
