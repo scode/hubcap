@@ -295,8 +295,9 @@ impl Git for SystemGit {
         let output = cmd.output()?;
         if !output.status.success() {
             return Err(format_err!(
-                "git show-ref terminated in error: {}",
-                String::from_utf8(output.stderr)?
+                "git show-ref terminated in error: stderr: {} stdout: {}",
+                String::from_utf8(output.stderr)?,
+                String::from_utf(output.stdout)?,
             ));
         }
 
