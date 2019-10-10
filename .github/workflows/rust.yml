@@ -16,5 +16,13 @@ jobs:
     - name: Build
       run: cargo build
 
+    - name: temp
+      run: |
+        git version
+        git show-ref
+        echo $?
+        git show-ref --head
+        echo $?
+
     - name: Test
       run: cargo test
