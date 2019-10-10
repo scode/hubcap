@@ -2,27 +2,13 @@ name: CI
 on: [push]
 jobs:
   test:
-    name: test
+    name: Test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
 
-    - name: git version
-      run: git version
-
-    - name: rust version
-      run: rustc --version
-
     - name: Build
       run: cargo build
-
-    - name: temp
-      run: |
-        git version
-        git show-ref
-        echo $?
-        git show-ref --head
-        echo $?
 
     - name: Test
       run: cargo test
