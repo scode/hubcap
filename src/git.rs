@@ -449,12 +449,38 @@ mod tests {
     use std::fs::File;
     use tempdir;
 
+    fn configured_git(repo_path: &Path) -> SystemGit {
+        let mut git = SystemGit::new();
+        git.repo_path(repo_path);
+
+        Command::new("git")
+            .arg("-C")
+            .arg(repo_path)
+            .arg("config")
+            .arg("--local")
+            .arg("user.email")
+            .arg("hubcabtest@example.com")
+            .output()
+            .expect("git config failed");
+
+        Command::new("git")
+            .arg("-C")
+            .arg(repo_path)
+            .arg("config")
+            .arg("--local")
+            .arg("user.name")
+            .arg("hubcabtest")
+            .output()
+            .expect("git config failed");
+
+        git
+    }
+
     #[test]
     fn test_git_init() {
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
-        let mut git = SystemGit::new();
-        git.repo_path(tmp_path);
+        let git = configured_git(tmp_path);
 
         assert!(!tmp_path.join(".git").exists());
 
@@ -764,8 +790,7 @@ mod tests {
         use std::io::prelude::*;
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
-        let mut git = SystemGit::new();
-        git.repo_path(tmp_path);
+        let git = configured_git(tmp_path);
 
         Command::new("git")
             .arg("-C")
@@ -805,8 +830,7 @@ mod tests {
     fn test_system_git_refs_empty() {
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
-        let mut git = SystemGit::new();
-        git.repo_path(tmp_path);
+        let git = configured_git(tmp_path);
 
         Command::new("git")
             .arg("-C")
