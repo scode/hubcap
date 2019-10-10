@@ -799,9 +799,15 @@ mod tests {
         Command::new("git")
             .arg("-C")
             .arg(tmp_path)
+            .arg("status")
+            .spawn()
+            .expect("failed to git show-ref");
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp_path)
             .arg("show-ref")
             .arg("--head")
-            .output()
+            .spawn()
             .expect("failed to git show-ref");
 
         let refs = git.refs().unwrap();
