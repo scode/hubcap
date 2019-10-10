@@ -778,6 +778,7 @@ mod tests {
 
         let mut f = File::create(tmp_path.join("testfile")).unwrap();
         f.write_all("test".as_bytes()).unwrap();
+        f.flush().unwrap();
 
         Command::new("git")
             .arg("-C")
