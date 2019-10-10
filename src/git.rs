@@ -290,7 +290,7 @@ impl Git for SystemGit {
     fn refs(&self) -> Result<Vec<ResolvedRef>, Error> {
         let mut cmd = self.git_command()?;
 
-        cmd.arg("show-ref").arg("--keff");
+        cmd.arg("show-ref").arg("--head");
 
         let output = cmd.output()?;
         if !output.status.success() {
