@@ -302,10 +302,7 @@ impl Git for SystemGit {
 
         let stdout = String::from_utf8(output.stdout)?;
 
-        stdout
-            .lines()
-            .map(sha_ref_to_resolved_ref)
-            .collect()
+        stdout.lines().map(sha_ref_to_resolved_ref).collect()
     }
 }
 
@@ -453,27 +450,44 @@ mod tests {
         let mut git = SystemGit::new();
         git.repo_path(repo_path);
 
-        Command::new("git")
-            .arg("-C")
-            .arg(repo_path)
-            .arg("config")
-            .arg("--local")
-            .arg("user.email")
-            .arg("hubcabtest@example.com")
-            .output()
-            .expect("git config failed");
+        check_output(Command::new("git").arg("-C").arg(repo_path).arg("init")).unwrap();
 
-        Command::new("git")
-            .arg("-C")
-            .arg(repo_path)
-            .arg("config")
-            .arg("--local")
-            .arg("user.name")
-            .arg("hubcabtest")
-            .output()
-            .expect("git config failed");
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(repo_path)
+                .arg("config")
+                .arg("--local")
+                .arg("user.email")
+                .arg("hubcabtest@example.com"),
+        )
+        .unwrap();
+
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(repo_path)
+                .arg("config")
+                .arg("--local")
+                .arg("user.name")
+                .arg("hubcabtest"),
+        )
+        .unwrap();
 
         git
+    }
+
+    fn check_output(cmd: &mut Command) -> Result<(), Error> {
+        let output = cmd.output()?;
+        if !output.status.success() {
+            return Err(format_err!(
+                "cmd exited unsuccessfully: stdout: {} stderr: {}",
+                String::from_utf8(output.stdout)?,
+                String::from_utf8(output.stderr)?,
+            ));
+        }
+
+        Ok(())
     }
 
     #[test]
@@ -481,8 +495,6 @@ mod tests {
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
         let git = configured_git(tmp_path);
-
-        assert!(!tmp_path.join(".git").exists());
 
         git.init().expect("git init failed");
         assert!(tmp_path.join(".git").exists());
@@ -497,12 +509,7 @@ mod tests {
 
         // An entirely clean working copy (catch special case of git status returning no output).
         {
-            Command::new("git")
-                .arg("-C")
-                .arg(tmp_path)
-                .arg("init")
-                .output()
-                .expect("failed to git init");
+            check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
             let status = git.status().unwrap();
             assert_eq!(status.len(), 0)
         }
@@ -792,32 +799,30 @@ mod tests {
         let tmp_path = tmp_dir.path();
         let git = configured_git(tmp_path);
 
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("init")
-            .output()
-            .expect("failed to git init");
+        check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
 
         let mut f = File::create(tmp_path.join("testfile")).unwrap();
         f.write_all("test".as_bytes()).unwrap();
 
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("add")
-            .arg("testfile")
-            .output()
-            .expect("failed to git init");
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("commit")
-            .arg("-m")
-            .arg("testcommit")
-            .arg("testfile")
-            .output()
-            .expect("failed to git init");
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(tmp_path)
+                .arg("add")
+                .arg("testfile"),
+        )
+        .unwrap();
+
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(tmp_path)
+                .arg("commit")
+                .arg("-m")
+                .arg("testcommit")
+                .arg("testfile"),
+        )
+        .unwrap();
 
         let refs = git.refs().unwrap();
         assert_eq!(refs.len(), 2);
@@ -832,12 +837,7 @@ mod tests {
         let tmp_path = tmp_dir.path();
         let git = configured_git(tmp_path);
 
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("init")
-            .output()
-            .expect("failed to git init");
+        check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
 
         assert!(git.refs().is_err());
     }
