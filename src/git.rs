@@ -773,7 +773,7 @@ mod tests {
             .arg("-C")
             .arg(tmp_path)
             .arg("init")
-            .output()
+            .spawn()
             .expect("failed to git init");
 
         let mut f = File::create(tmp_path.join("testfile")).unwrap();
@@ -785,7 +785,7 @@ mod tests {
             .arg(tmp_path)
             .arg("add")
             .arg("testfile")
-            .output()
+            .spawn()
             .expect("failed to git init");
         Command::new("git")
             .arg("-C")
@@ -794,7 +794,7 @@ mod tests {
             .arg("-m")
             .arg("testcommit")
             .arg("testfile")
-            .output()
+            .spawn()
             .expect("failed to git init");
         Command::new("git")
             .arg("-C")
