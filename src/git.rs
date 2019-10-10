@@ -796,6 +796,13 @@ mod tests {
             .arg("testfile")
             .output()
             .expect("failed to git init");
+        Command::new("git")
+            .arg("-C")
+            .arg(tmp_path)
+            .arg("show-ref")
+            .arg("--head")
+            .output()
+            .expect("failed to git show-ref");
 
         let refs = git.refs().unwrap();
         assert_eq!(refs.len(), 2);
