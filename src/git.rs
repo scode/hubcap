@@ -304,10 +304,7 @@ impl Git for SystemGit {
 
         let stdout = String::from_utf8(output.stdout)?;
 
-        stdout
-            .lines()
-            .map(|line| sha_ref_to_resolved_ref(line))
-            .collect()
+        stdout.lines().map(sha_ref_to_resolved_ref).collect()
     }
 }
 
@@ -352,10 +349,10 @@ fn sha_ref_to_resolved_ref<T: Into<String>>(line: T) -> Result<ResolvedRef, Erro
         return Err(format_err!("expected sha followed by ref name, got: {}", s));
     }
 
-    return Ok(ResolvedRef {
+    Ok(ResolvedRef {
         sha: v[0].into(),
         name: v[1].into(),
-    });
+    })
 }
 
 /// Given a sequence of lines (obtained from `git status -z`), produce the corresponding set of
@@ -451,14 +448,55 @@ mod tests {
     use std::fs::File;
     use tempdir;
 
+    fn configured_git(repo_path: &Path) -> SystemGit {
+        let mut git = SystemGit::new();
+        git.repo_path(repo_path);
+
+        check_output(Command::new("git").arg("-C").arg(repo_path).arg("init")).unwrap();
+
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(repo_path)
+                .arg("config")
+                .arg("--local")
+                .arg("user.email")
+                .arg("hubcabtest@example.com"),
+        )
+        .unwrap();
+
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(repo_path)
+                .arg("config")
+                .arg("--local")
+                .arg("user.name")
+                .arg("hubcabtest"),
+        )
+        .unwrap();
+
+        git
+    }
+
+    fn check_output(cmd: &mut Command) -> Result<(), Error> {
+        let output = cmd.output()?;
+        if !output.status.success() {
+            return Err(format_err!(
+                "cmd exited unsuccessfully: stdout: {} stderr: {}",
+                String::from_utf8(output.stdout)?,
+                String::from_utf8(output.stderr)?,
+            ));
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_git_init() {
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
-        let mut git = SystemGit::new();
-        git.repo_path(tmp_path);
-
-        assert!(!tmp_path.join(".git").exists());
+        let git = configured_git(tmp_path);
 
         git.init().expect("git init failed");
         assert!(tmp_path.join(".git").exists());
@@ -473,12 +511,7 @@ mod tests {
 
         // An entirely clean working copy (catch special case of git status returning no output).
         {
-            Command::new("git")
-                .arg("-C")
-                .arg(tmp_path)
-                .arg("init")
-                .output()
-                .expect("failed to git init");
+            check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
             let status = git.status().unwrap();
             assert_eq!(status.len(), 0)
         }
@@ -766,49 +799,33 @@ mod tests {
         use std::io::prelude::*;
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
-        let mut git = SystemGit::new();
-        git.repo_path(tmp_path);
+        let git = configured_git(tmp_path);
 
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("init")
-            .spawn()
-            .expect("failed to git init");
+        check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
 
         let mut f = File::create(tmp_path.join("testfile")).unwrap();
         f.write_all("test".as_bytes()).unwrap();
         f.flush().unwrap();
 
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("add")
-            .arg("testfile")
-            .spawn()
-            .expect("failed to git init");
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("commit")
-            .arg("-m")
-            .arg("testcommit")
-            .arg("testfile")
-            .spawn()
-            .expect("failed to git init");
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("status")
-            .spawn()
-            .expect("failed to git show-ref");
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("show-ref")
-            .arg("--head")
-            .spawn()
-            .expect("failed to git show-ref");
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(tmp_path)
+                .arg("add")
+                .arg("testfile"),
+        )
+        .unwrap();
+
+        check_output(
+            Command::new("git")
+                .arg("-C")
+                .arg(tmp_path)
+                .arg("commit")
+                .arg("-m")
+                .arg("testcommit")
+                .arg("testfile"),
+        )
+        .unwrap();
 
         let refs = git.refs().unwrap();
         assert_eq!(refs.len(), 2);
@@ -821,15 +838,9 @@ mod tests {
     fn test_system_git_refs_empty() {
         let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
         let tmp_path = tmp_dir.path();
-        let mut git = SystemGit::new();
-        git.repo_path(tmp_path);
+        let git = configured_git(tmp_path);
 
-        Command::new("git")
-            .arg("-C")
-            .arg(tmp_path)
-            .arg("init")
-            .output()
-            .expect("failed to git init");
+        check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
 
         assert!(git.refs().is_err());
     }
