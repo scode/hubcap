@@ -295,10 +295,8 @@ impl Git for SystemGit {
         let output = cmd.output()?;
         if !output.status.success() {
             return Err(format_err!(
-                "git show-ref terminated in error: stderr: {} stdout: {} status: {}",
-                String::from_utf8(output.stderr)?,
-                String::from_utf8(output.stdout)?,
-                output.status,
+                "git show-ref terminated in error: {}",
+                String::from_utf8(output.stderr)?
             ));
         }
 
@@ -805,7 +803,6 @@ mod tests {
 
         let mut f = File::create(tmp_path.join("testfile")).unwrap();
         f.write_all("test".as_bytes()).unwrap();
-        f.flush().unwrap();
 
         check_output(
             Command::new("git")
