@@ -179,7 +179,7 @@ pub fn interpret_ref<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error
 }
 
 pub trait Git {
-    // Call "git init".
+    /// Initialize a repo (`git init`).
     fn init(&self) -> Result<(), Error>;
 
     /// Inspect the status of the working copy and return a description of it.
@@ -420,7 +420,7 @@ fn status_lines_to_entries<'a>(
     }
 
     if maybe_partial_status.is_some() {
-        bail!("encountered renamed/copied status wiht no subsequent follow-up line");
+        bail!("encountered renamed/copied status with no subsequent follow-up line");
     }
 
     Ok(entries)
