@@ -1,5 +1,6 @@
 use failure::Error;
 use regex::Regex;
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -194,6 +195,24 @@ pub trait Git {
     /// If the repo has no refs (typically a freshly initialized empty repo), an error
     /// is returned (this is arguably unexpected, but fits the behavior of show-ref).
     fn refs(&self) -> Result<Vec<ResolvedRef>, Error>;
+
+    /// Set a --local configuration value (`git config --local key value`).
+    ///
+    /// Any existing value will be overwritten.
+    ///
+    /// The key must start with a section name followed by a period - see git-config(1).
+    fn config_local_set(&self, key: &str, val: &str) -> Result<(), Error>;
+
+    /// Unset a --local configuration value (`git config --local --unset key`).
+    ///
+    /// If the key does not exist, it is considered an error.
+    fn config_local_unset(&self, key: &str) -> Result<(), Error>;
+
+    /// List all --local configuration values (`git config --local --list`).
+    fn config_local_list(&self) -> Result<HashMap<String, String>, Error>;
+
+    /// Get a configuration value, if present (`git config --local --get`).
+    fn config_local_get(&self, key: &str) -> Result<Option<String>, Error>;
 }
 
 /// An implementation of the Git trait which uses a git binary present on the system to interact
@@ -303,6 +322,97 @@ impl Git for SystemGit {
         let stdout = String::from_utf8(output.stdout)?;
 
         stdout.lines().map(sha_ref_to_resolved_ref).collect()
+    }
+
+    fn config_local_set(&self, key: &str, val: &str) -> Result<(), Error> {
+        let mut cmd = self.git_command()?;
+
+        cmd.arg("config").arg("--local").arg(key).arg(val);
+
+        let output = cmd.output()?;
+        if !output.status.success() {
+            return Err(format_err!(
+                "git config terminated in error: {}",
+                String::from_utf8(output.stderr)?
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn config_local_unset(&self, key: &str) -> Result<(), Error> {
+        let mut cmd = self.git_command()?;
+
+        cmd.arg("config").arg("--local").arg("--unset").arg(key);
+
+        let output = cmd.output()?;
+        if !output.status.success() {
+            return Err(format_err!(
+                "git config terminated in error: {}",
+                String::from_utf8(output.stderr)?
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn config_local_list(&self) -> Result<HashMap<String, String>, Error> {
+        let mut cmd = self.git_command()?;
+
+        cmd.arg("config").arg("--local").arg("--list").arg("-z");
+
+        let output = cmd.output()?;
+        if !output.status.success() {
+            return Err(format_err!(
+                "git config terminated in error: {}",
+                String::from_utf8(output.stderr)?
+            ));
+        }
+
+        let mut items: HashMap<String, String> = HashMap::new();
+
+        // When -z is used, newlines are used to delimit keys from values and a zero byte is used
+        // to indicate the end of a value (note: values may contain newlines).
+        let stdout = String::from_utf8(output.stdout)?;
+        let chars = stdout.chars();
+
+        let mut key = String::new();
+        let mut value = String::new();
+        let mut inkey = true;
+
+        for c in chars {
+            if inkey {
+                if c == '\n' {
+                    inkey = false;
+                    continue;
+                }
+                key.push(c)
+            } else {
+                if c == '\0' {
+                    inkey = true;
+                    items.insert(key.clone(), value.clone());
+                    key.clear();
+                    value.clear();
+                    continue;
+                }
+                value.push(c)
+            }
+        }
+
+        if !key.is_empty() || !value.is_empty() {
+            return Err(format_err!("git config --local --list output parsing ended on unexpected byte; we expect the final byte to be a zero"));
+        }
+
+        Ok(items)
+    }
+
+    fn config_local_get(&self, key: &str) -> Result<Option<String>, Error> {
+        // Git does not offer a documented way of differentiating between "config key does not
+        // exist" and any other failure. As a result, we implement this in terms of
+        // config_local_list() instead of using the --get option.
+        let items = self.config_local_list()?;
+
+        Ok(items.get(key).map(|s| s.to_owned()))
     }
 }
 
@@ -840,5 +950,46 @@ mod tests {
         check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
 
         assert!(git.refs().is_err());
+    }
+
+    #[test]
+    fn test_system_git_config_basics() {
+        let tmp_dir = tempdir::TempDir::new("hubcap-test").unwrap();
+        let tmp_path = tmp_dir.path();
+        let git = configured_git(tmp_path);
+
+        check_output(Command::new("git").arg("-C").arg(tmp_path).arg("init")).unwrap();
+
+        assert_eq!(git.config_local_get("hubcap.test").unwrap(), None);
+
+        git.config_local_set("hubcap.test", "val").unwrap();
+
+        assert_eq!(
+            git.config_local_get("hubcap.test").unwrap(),
+            Some("val".into())
+        );
+
+        let items = git.config_local_list().unwrap();
+        assert!(items.contains_key("hubcap.test"));
+
+        git.config_local_unset("hubcap.test").unwrap();
+        assert_eq!(git.config_local_get("hubcap.test").unwrap(), None);
+
+        let items = git.config_local_list().unwrap();
+        assert!(!items.contains_key("hubcap.test"));
+
+        // Test that newlines in values are handled correctly.
+        git.config_local_set("hubcap.test", "a\nb").unwrap();
+        assert_eq!(
+            git.config_local_get("hubcap.test").unwrap(),
+            Some("a\nb".into())
+        );
+
+        // Test that empty values are handled correctly.
+        git.config_local_set("hubcap.test", "").unwrap();
+        assert_eq!(
+            git.config_local_get("hubcap.test").unwrap(),
+            Some("".into())
+        );
     }
 }
