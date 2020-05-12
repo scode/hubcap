@@ -1,12 +1,11 @@
 extern crate clap;
-#[macro_use]
-extern crate failure;
 extern crate serde_json;
 
+use anyhow::anyhow;
+use anyhow::Error;
 use clap::App;
 use clap::Arg;
 use clap::SubCommand;
-use failure::Error;
 
 fn main() {
     if let Err(ref e) = run() {
@@ -32,9 +31,9 @@ fn run() -> Result<(), Error> {
         .get_matches();
 
     if let Some(_matches) = matches.subcommand_matches("status") {
-        Err(format_err!("not yet implemented"))
+        Err(anyhow!("not yet implemented"))
     } else {
         // TODO(scode): Print help when no args given.
-        Err(format_err!("no cmd given"))
+        Err(anyhow!("no cmd given"))
     }
 }

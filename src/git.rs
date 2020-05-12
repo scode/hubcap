@@ -1,4 +1,6 @@
-use failure::Error;
+use anyhow::anyhow;
+use anyhow::Error;
+use anyhow::Result;
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::Path;
@@ -143,7 +145,7 @@ pub fn interpret_ref<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error
     let re = Regex::new(r"^(?P<head>HEAD)|refs/tags/(?P<tag>.*)|refs/heads/(?P<localbranch>.*)|refs/remotes/(?P<remote>[^/]+)/(?P<remotebranch>.*)$").unwrap();
     let capture = re
         .captures(ref_name.as_ref())
-        .ok_or_else(|| format_err!("could not interpret ref: [{}]", ref_name.as_ref()))?;
+        .ok_or_else(|| anyhow!("could not interpret ref: [{}]", ref_name.as_ref()))?;
 
     let head = capture.name("head");
     if head.is_some() {
@@ -169,14 +171,11 @@ pub fn interpret_ref<T: AsRef<str>>(ref_name: T) -> Result<InterpretedRef, Error
                     name: remote_branch.as_str().into(),
                 })
             }
-            None => return Err(format_err!("bug: rematched remote but not remotebranch")),
+            None => return Err(anyhow!("bug: rematched remote but not remotebranch")),
         }
     }
 
-    Err(format_err!(
-        "caould not interpret ref: {}",
-        ref_name.as_ref()
-    ))
+    Err(anyhow!("caould not interpret ref: {}", ref_name.as_ref()))
 }
 
 pub trait Git {
@@ -273,7 +272,7 @@ impl Git for SystemGit {
         let output = cmd.output()?;
 
         if !output.status.success() {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "git init failed: {}",
                 String::from_utf8(output.stderr)?
             ));
@@ -290,7 +289,7 @@ impl Git for SystemGit {
         let output = cmd.output()?;
 
         if !output.status.success() {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "git terminated in error: {}",
                 String::from_utf8(output.stderr)?
             ));
@@ -300,7 +299,9 @@ impl Git for SystemGit {
 
         let mut lines: Vec<&str> = stdout.split('\0').collect();
         if *lines.last().unwrap() != "" {
-            bail!("expected trailing zero in git status output; got none")
+            return Err(anyhow!(
+                "expected trailing zero in git status output; got none"
+            ));
         }
         lines.pop();
         status_lines_to_entries(lines)
@@ -313,7 +314,7 @@ impl Git for SystemGit {
 
         let output = cmd.output()?;
         if !output.status.success() {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "git show-ref terminated in error: {}",
                 String::from_utf8(output.stderr)?
             ));
@@ -331,7 +332,7 @@ impl Git for SystemGit {
 
         let output = cmd.output()?;
         if !output.status.success() {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "git config terminated in error: {}",
                 String::from_utf8(output.stderr)?
             ));
@@ -347,7 +348,7 @@ impl Git for SystemGit {
 
         let output = cmd.output()?;
         if !output.status.success() {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "git config terminated in error: {}",
                 String::from_utf8(output.stderr)?
             ));
@@ -363,7 +364,7 @@ impl Git for SystemGit {
 
         let output = cmd.output()?;
         if !output.status.success() {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "git config terminated in error: {}",
                 String::from_utf8(output.stderr)?
             ));
@@ -400,7 +401,7 @@ impl Git for SystemGit {
         }
 
         if !key.is_empty() || !value.is_empty() {
-            return Err(format_err!("git config --local --list output parsing ended on unexpected byte; we expect the final byte to be a zero"));
+            return Err(anyhow!("git config --local --list output parsing ended on unexpected byte; we expect the final byte to be a zero"));
         }
 
         Ok(items)
@@ -432,7 +433,7 @@ fn make_status(status: &str, rest: &str, next_line: Option<&str>) -> Result<Stat
         "U" => Ok(Status::UpdatedUnMerged(PathBuf::from(rest))),
         "?" => Ok(Status::Untracked(PathBuf::from(rest))),
         " " => Ok(Status::Clean(PathBuf::from(rest))),
-        _ => Err(format_err!("unrecognized status: {}", status)),
+        _ => Err(anyhow!("unrecognized status: {}", status)),
     }
 }
 
@@ -454,7 +455,7 @@ fn sha_ref_to_resolved_ref<T: Into<String>>(line: T) -> Result<ResolvedRef, Erro
     let s: String = line.into();
     let v: Vec<&str> = s.split_whitespace().collect();
     if v.len() != 2 {
-        return Err(format_err!("expected sha followed by ref name, got: {}", s));
+        return Err(anyhow!("expected sha followed by ref name, got: {}", s));
     }
 
     Ok(ResolvedRef {
@@ -508,7 +509,7 @@ fn status_lines_to_entries<'a>(
             maybe_partial_status = None;
         } else {
             let capture = status_regex().captures(line).ok_or_else(|| {
-                format_err!(
+                anyhow!(
                     "unexpected git status line (does not match regex): [{}]",
                     line
                 )
@@ -530,7 +531,9 @@ fn status_lines_to_entries<'a>(
     }
 
     if maybe_partial_status.is_some() {
-        bail!("encountered renamed/copied status with no subsequent follow-up line");
+        return Err(anyhow!(
+            "encountered renamed/copied status with no subsequent follow-up line"
+        ));
     }
 
     Ok(entries)
@@ -546,7 +549,7 @@ fn status_regex() -> Regex {
 /// Future: Use https://doc.rust-lang.org/std/option/struct.NoneError.html when stable?
 fn path_to_str(p: &Path) -> Result<String, Error> {
     p.to_str()
-        .ok_or_else(|| format_err!("path is not valid utf-8: {:?}", p))
+        .ok_or_else(|| anyhow!("path is not valid utf-8: {:?}", p))
         .map(std::borrow::ToOwned::to_owned)
 }
 
@@ -590,7 +593,7 @@ mod tests {
     fn check_output(cmd: &mut Command) -> Result<(), Error> {
         let output = cmd.output()?;
         if !output.status.success() {
-            return Err(format_err!(
+            return Err(anyhow!(
                 "cmd exited unsuccessfully: stdout: {} stderr: {}",
                 String::from_utf8(output.stdout)?,
                 String::from_utf8(output.stderr)?,
